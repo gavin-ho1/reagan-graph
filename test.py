@@ -84,7 +84,7 @@ def load_poverty_data(csv_path):
     return years_data, poverty_numbers_data, poverty_percent_data
 
 # --- Plotting Function ---
-def create_poverty_plot(years_list, data_list, title, ylabel, filename, color_term1, color_term2, term1_start, term1_end, term2_start, term2_end):
+def create_poverty_plot(years_list, data_list, title, ylabel, filename, color_term1, color_term2, term1_start, term1_end, term2_start, term2_end, annotate=True):
     """Creates and saves a poverty plot."""
     plt.figure(figsize=(14, 7))
     plt.plot(years_list, data_list, marker='o', linestyle='-', label=ylabel, color='black')
@@ -94,14 +94,14 @@ def create_poverty_plot(years_list, data_list, title, ylabel, filename, color_te
     plt.grid(True)
     plt.xticks(rotation=45)
     
-    # Add annotation for Reagan's first term
-    plt.axvspan(term1_start, term1_end + 1, color=color_term1, alpha=0.6, 
-                label=f'Reagan 1st Term ({term1_start}-{term1_end})')
-    # Add annotation for Reagan's second term
-    plt.axvspan(term2_start, term2_end + 1, color=color_term2, alpha=0.6, 
-                label=f'Reagan 2nd Term ({term2_start}-{term2_end})')
-    
-    plt.legend()
+    if annotate:
+        # Add annotation for Reagan's first term
+        plt.axvspan(term1_start, term1_end + 1, color=color_term1, alpha=0.6, 
+                    label=f'Reagan 1st Term ({term1_start}-{term1_end})')
+        # Add annotation for Reagan's second term
+        plt.axvspan(term2_start, term2_end + 1, color=color_term2, alpha=0.6, 
+                    label=f'Reagan 2nd Term ({term2_start}-{term2_end})')
+        plt.legend()
     plt.tight_layout()
     
     # Save the plot to the current working directory
@@ -118,26 +118,28 @@ if __name__ == "__main__":
     if not years:
         print("No data loaded. Please check the CSV file and parsing logic.")
     else:
-        # Create the first plot: Number of people below poverty
-        create_poverty_plot(
-            years, poverty_numbers,
-            'Number of People Below Poverty in the US (All Races)',
-            'Number of People (in thousands)',
-            "poverty_number_plot.png",
-            COLOR_TERM1, COLOR_TERM2,
-            REAGAN_TERM1_START, REAGAN_TERM1_END,
-            REAGAN_TERM2_START, REAGAN_TERM2_END
-        )
-
-        # Create the second plot: Percent of people below poverty
+        # Create the non-annotated plot: Percent of people below poverty
         create_poverty_plot(
             years, poverty_percent,
             'Percent of People Below Poverty in the US (All Races)',
             'Percent (%)',
-            "poverty_percent_plot.png",
+            "poverty_percent_plot.png", # Original name for non-annotated version
             COLOR_TERM1, COLOR_TERM2,
             REAGAN_TERM1_START, REAGAN_TERM1_END,
-            REAGAN_TERM2_START, REAGAN_TERM2_END
+            REAGAN_TERM2_START, REAGAN_TERM2_END,
+            annotate=False
+        )
+
+        # Create the annotated plot: Percent of people below poverty
+        create_poverty_plot(
+            years, poverty_percent,
+            'Percent of People Below Poverty in the US (All Races) - Annotated',
+            '',  # Removed y-axis label
+            "poverty_percent_plot_annotated.png", # New name for annotated version
+            COLOR_TERM1, COLOR_TERM2,
+            REAGAN_TERM1_START, REAGAN_TERM1_END,
+            REAGAN_TERM2_START, REAGAN_TERM2_END,
+            annotate=True
         )
 
         print("Plots created and saved. Interactive display (plt.show()) is commented out but available for local use.")
