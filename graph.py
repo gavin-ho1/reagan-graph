@@ -3,10 +3,12 @@ import matplotlib.pyplot as plt
 import csv
 import os
 
-# --- Constants ---
-CSV_FILE_PATH = "hstpov2.csv"
-TARGET_HEADER_INDICATOR = "All Races"
-LINES_TO_SKIP_AFTER_HEADER = 3
+# --- Global Constants ---
+RAW_DATA_DIR = "raw-data"
+OUTPUT_DIR = "output"
+HSTPOV2_FILENAME = "hstpov2.csv"
+HSTPOV6_FILENAME = "hstpov6.csv"
+
 DEMOGRAPHIC_BREAK_INDICATORS = [
     "White Alone", "Black Alone", "Asian Alone",
     "American Indian", "Hispanic", "Two or More"
@@ -16,15 +18,30 @@ DEMOGRAPHIC_BREAK_INDICATORS = [
 REAGAN_TERM1_START = 1981
 REAGAN_TERM1_END = 1984
 REAGAN_TERM2_START = 1985
-REAGAN_TERM2_END = 1988
+REAGAN_TERM2_END = 1988 # Technically 1989, but his presidency ended early into 1989, so it doesn't really count for that year
 
 # Academic-friendly colors
 COLOR_TERM1 = '#FFB347'  # Light Orange/Apricot
 COLOR_TERM2 = '#ADD8E6'  # Light Blue
 
 # --- Data Loading and Parsing ---
-def load_poverty_data(csv_path):
-    """Loads poverty data from the specified CSV file."""
+def load_poverty_data(csv_path, target_header_indicator, lines_to_skip_after_header, 
+                      year_col_idx, num_col_idx, pct_col_idx, header_search_in_cell=False):
+    """
+    Loads poverty data from a specified CSV file.
+
+    Args:
+        csv_path (str): Path to the CSV file.
+        target_header_indicator (str): A string unique to the header row to start parsing.
+        lines_to_skip_after_header (int): Number of lines to skip after the header is found.
+        year_col_idx (int): Column index for the year.
+        num_col_idx (int): Column index for the poverty number.
+        pct_col_idx (int): Column index for the poverty percent.
+        header_search_in_cell (bool): If True, search for header_indicator within any cell
+                                     in a row. If False, search only in the first cell.
+    Returns:
+        tuple: (years_data, poverty_numbers_data, poverty_percent_data)
+    """
     years_data = []
     poverty_numbers_data = []
     poverty_percent_data = []
@@ -33,38 +50,50 @@ def load_poverty_data(csv_path):
         csv_reader = csv.reader(file)
         
         data_header_found = False
-        lines_to_skip = 0
+        current_lines_to_skip = 0 # Use a different variable name to avoid modifying the input parameter
         
         for row in csv_reader:
             if not data_header_found:
-                if row and TARGET_HEADER_INDICATOR in row[0]: 
-                    data_header_found = True
-                    lines_to_skip = LINES_TO_SKIP_AFTER_HEADER
-                continue
+                if header_search_in_cell: # For headers like in hstpov6.csv (part of a larger string)
+                    if row and any(target_header_indicator in cell for cell in row):
+                        data_header_found = True
+                        current_lines_to_skip = lines_to_skip_after_header
+                else: # For headers like in hstpov2.csv (first cell usually contains the indicator)
+                    if row and target_header_indicator in row[0]:
+                        data_header_found = True
+                        current_lines_to_skip = lines_to_skip_after_header
+                if not data_header_found: # Skip if header not yet found
+                    continue
             
-            if lines_to_skip > 0:
-                lines_to_skip -= 1
+            if current_lines_to_skip > 0:
+                current_lines_to_skip -= 1
                 continue
 
-            if len(row) > 3 and row[0]: # Ensure row has enough columns and a year entry
+            # Ensure row has enough columns and a year entry, consider year_col_idx
+            if len(row) > max(year_col_idx, num_col_idx, pct_col_idx) and row[year_col_idx]: 
                 # Stop parsing if we hit a new demographic section
-                if any(indicator in row[0] for indicator in DEMOGRAPHIC_BREAK_INDICATORS):
+                if any(indicator in row[year_col_idx] for indicator in DEMOGRAPHIC_BREAK_INDICATORS):
                     break 
                 
                 try:
-                    year_str = row[0].split(" ")[0] # Expects year to be the first part of the first column
-                    if not year_str.isdigit(): # Skip if year is not a number
+                    year_str = row[year_col_idx].split(" ")[0] 
+                    if not year_str.isdigit(): 
                         continue
                     year = int(year_str)
                     
-                    # Clean and convert poverty number and percent
-                    number_str = row[2].replace(",", "")
-                    percent_str = row[3].replace(",", "")
+                    number_str = row[num_col_idx].replace(",", "")
+                    percent_str = row[pct_col_idx].replace(",", "")
                     
-                    # Ensure data is present and not 'N/A'
-                    if number_str and percent_str and number_str.lower() != 'n' and percent_str.lower() != 'n':
+                    if percent_str and percent_str.lower() != 'n' and percent_str.lower() != 'na' and percent_str.strip() != '':
                         years_data.append(year)
-                        poverty_numbers_data.append(int(number_str))
+                        if number_str and number_str.lower() != 'n' and number_str.lower() != 'na' and number_str.strip() != '':
+                            try:
+                                poverty_numbers_data.append(int(number_str))
+                            except ValueError:
+                                poverty_numbers_data.append(0) 
+                        else:
+                            poverty_numbers_data.append(0) 
+
                         poverty_percent_data.append(float(percent_str))
                 except ValueError as e:
                     print(f"Skipping row due to data conversion error: {row} - {e}")
@@ -87,10 +116,13 @@ def load_poverty_data(csv_path):
 def create_poverty_plot(years_list, data_list, title, ylabel, filename, color_term1, color_term2, term1_start, term1_end, term2_start, term2_end, annotate=True):
     """Creates and saves a poverty plot."""
     plt.figure(figsize=(14, 7))
-    plt.plot(years_list, data_list, marker='o', linestyle='-', label=ylabel, color='black')
+    # If annotated, the main plot line will not have a label in the legend.
+    # The ylabel is still used for the y-axis, but not for the legend entry of the line itself.
+    # The main plot line will never have a label in the legend for any graph type based on new requirements.
+    plt.plot(years_list, data_list, marker='o', linestyle='-', label="", color='black')
     plt.title(title)
     plt.xlabel('Year')
-    plt.ylabel(ylabel)
+    plt.ylabel(ylabel) # Y-axis label always shown
     plt.grid(True)
     plt.xticks(rotation=45)
     
@@ -101,46 +133,104 @@ def create_poverty_plot(years_list, data_list, title, ylabel, filename, color_te
         # Add annotation for Reagan's second term
         plt.axvspan(term2_start, term2_end + 1, color=color_term2, alpha=0.6, 
                     label=f'Reagan 2nd Term ({term2_start}-{term2_end})')
-        plt.legend()
+        # Only show legend if there are items to show (i.e., the annotations)
+        handles, labels = plt.gca().get_legend_handles_labels()
+        if handles: # Only call legend if there are actual items to put in it.
+            plt.legend()
+    # No legend for non-annotated plots
+        
     plt.tight_layout()
     
-    # Save the plot to the current working directory
-    save_path = os.path.join(os.getcwd(), filename)
+    # Ensure the output directory exists.
+    os.makedirs(OUTPUT_DIR, exist_ok=True)
+    
+    # Save the plot to the output directory.
+    save_path = os.path.join(OUTPUT_DIR, filename)
     plt.savefig(save_path)
     # plt.show() # Uncomment for interactive display in a local environment
     plt.close()
     print(f"Plot saved: {save_path}")
 
 # --- Main Script Logic ---
-if __name__ == "__main__":
-    years, poverty_numbers, poverty_percent = load_poverty_data(CSV_FILE_PATH)
+def main():
+    """Main function to load data from multiple CSVs and generate respective plots."""
+    
+    # Configurations for each CSV file and its corresponding plots
+    plot_configurations = [
+        {
+            "csv_filename": HSTPOV2_FILENAME,
+            "target_header": "All Races",
+            "lines_to_skip": 3,
+            "year_col": 0,
+            "num_col": 2,  # "Number" under "Below poverty" for hstpov2.csv
+            "pct_col": 3,  # "Percent" under "Below poverty" for hstpov2.csv
+            "header_search_in_cell": False, # For hstpov2, header is usually in row[0]
+            "plot_title_base": "Percent of People Below Poverty in the US (All Races)",
+            "plot_ylabel": "Percent (%)",
+            "plot_filename_base": "poverty_percent_plot"
+        },
+        {
+            "csv_filename": HSTPOV6_FILENAME,
+            "target_header": "Below 1.25",
+            "lines_to_skip": 0,
+            "year_col": 0,
+            "num_col": 4,  # "Number" for "Below 1.25" in hstpov6.csv
+            "pct_col": 5,  # "Percent" for "Below 1.25" in hstpov6.csv
+            "header_search_in_cell": True, # For hstpov6, header is part of a cell string
+            "plot_title_base": "Percent of People Below 1.25 of Poverty Level in the US (All Races)",
+            "plot_ylabel": "Percent (%) Below 1.25 of Poverty Level",
+            "plot_filename_base": "poverty_below_125_plot"
+        }
+    ]
 
-    if not years:
-        print("No data loaded. Please check the CSV file and parsing logic.")
-    else:
-        # Create the non-annotated plot: Percent of people below poverty
+    for config in plot_configurations:
+        csv_full_path = os.path.join(RAW_DATA_DIR, config["csv_filename"])
+        
+        years, _, poverty_percentages = load_poverty_data(
+            csv_full_path,
+            config["target_header"],
+            config["lines_to_skip"],
+            config["year_col"],
+            config["num_col"],
+            config["pct_col"],
+            header_search_in_cell=config["header_search_in_cell"]
+        )
+
+        if not years:
+            print(f"No data loaded from {csv_full_path}. Please check the CSV file and parsing logic.")
+            continue  # Skip to the next configuration if data loading failed
+
+        print(f"Processing plots for {csv_full_path}...")
+
+        # Create the non-annotated plot
         create_poverty_plot(
-            years, poverty_percent,
-            'Percent of People Below Poverty in the US (All Races)',
-            'Percent (%)',
-            "poverty_percent_plot.png", # Original name for non-annotated version
-            COLOR_TERM1, COLOR_TERM2,
-            REAGAN_TERM1_START, REAGAN_TERM1_END,
-            REAGAN_TERM2_START, REAGAN_TERM2_END,
+            years_list=years, 
+            data_list=poverty_percentages,
+            title=config["plot_title_base"],
+            ylabel=config["plot_ylabel"],
+            filename=f"{config['plot_filename_base']}.png",
+            color_term1=COLOR_TERM1, color_term2=COLOR_TERM2,
+            term1_start=REAGAN_TERM1_START, term1_end=REAGAN_TERM1_END,
+            term2_start=REAGAN_TERM2_START, term2_end=REAGAN_TERM2_END,
             annotate=False
         )
 
-        # Create the annotated plot: Percent of people below poverty
+        # Create the annotated plot
         create_poverty_plot(
-            years, poverty_percent,
-            'Percent of People Below Poverty in the US (All Races) - Annotated',
-            '',  # Removed y-axis label
-            "poverty_percent_plot_annotated.png", # New name for annotated version
-            COLOR_TERM1, COLOR_TERM2,
-            REAGAN_TERM1_START, REAGAN_TERM1_END,
-            REAGAN_TERM2_START, REAGAN_TERM2_END,
+            years_list=years, 
+            data_list=poverty_percentages,
+            title=f"{config['plot_title_base']} - Annotated",
+            ylabel=config["plot_ylabel"],
+            filename=f"{config['plot_filename_base']}_annotated.png",
+            color_term1=COLOR_TERM1, color_term2=COLOR_TERM2,
+            term1_start=REAGAN_TERM1_START, term1_end=REAGAN_TERM1_END,
+            term2_start=REAGAN_TERM2_START, term2_end=REAGAN_TERM2_END,
             annotate=True
         )
+        
+    print("\nAll requested plots created and saved (if data was available).")
+    print("Interactive display (plt.show()) is commented out but available for local use.")
 
-        print("Plots created and saved. Interactive display (plt.show()) is commented out but available for local use.")
+if __name__ == "__main__":
+    main()
 
