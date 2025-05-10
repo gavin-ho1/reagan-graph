@@ -2,6 +2,7 @@
 import matplotlib.pyplot as plt
 import csv
 import os
+from matplotlib.ticker import MultipleLocator
 
 # --- Global Constants ---
 RAW_DATA_DIR = "raw-data"
@@ -124,8 +125,17 @@ def create_poverty_plot(years_list, data_list, title, ylabel, filename, color_te
     plt.xlabel('Year')
     plt.ylabel(ylabel) # Y-axis label always shown
     plt.grid(True)
-    plt.xticks(rotation=45)
-    
+
+    # Set x-axis ticks to be every 5 years
+    min_year = min(years_list)
+    max_year = max(years_list)
+    plt.xticks(range(min_year - (min_year % 5), max_year + 5, 5), rotation=45)
+
+    # Increase y-axis tick frequency
+    from matplotlib.ticker import MultipleLocator
+    ax = plt.gca()
+    ax.yaxis.set_major_locator(MultipleLocator(2)) # Adjust the '2' for desired percent interval
+
     if annotate:
         # Add annotation for Reagan's first term
         plt.axvspan(term1_start, term1_end + 1, color=color_term1, alpha=0.6, 
