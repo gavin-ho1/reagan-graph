@@ -29,7 +29,7 @@ COLOR_TERM2 = '#ADD8E6'  # Light Blue
 
 # --- Data Loading and Parsing ---
 def load_poverty_data(csv_path, target_header_indicator, lines_to_skip_after_header,
-                      year_col_idx, num_col_idx, pct_col_idx, header_search_in_cell=False):
+                    year_col_idx, num_col_idx, pct_col_idx, header_search_in_cell=False):
     """
     Loads poverty data from a specified CSV file.
 
@@ -40,8 +40,8 @@ def load_poverty_data(csv_path, target_header_indicator, lines_to_skip_after_hea
         year_col_idx (int): Column index for the year.
         num_col_idx (int): Column index for the poverty number.
         pct_col_idx (int): Column index for the poverty percent.
-        header_search_in_cell (bool): If True, search for header_indicator within any cell
-                                     in a row. If False, search only in the first cell.
+        header_search_in_cell (bool): If True, search for header_indicator within any cellin a row. 
+        If False, search only in the first cell.
     Returns:
         tuple: (years_data, poverty_numbers_data, poverty_percent_data)
     """
@@ -171,8 +171,8 @@ def load_unemployment_data(csv_path, target_header_indicator, lines_to_skip_afte
                                 print(f"Skipping data point due to conversion error: Year={year}, Month={month}, Value={rate_str} - {e}")
                                 continue
             elif not row or (not row[0] and data_header_found): # Handle empty rows or end of relevant data
-                 if dates_data: # If we have already collected some data, assume end of section
-                     break
+                if dates_data: # If we have already collected some data, assume end of section
+                    break
     return dates_data, unemployment_rates_data
 
 # --- Plotting Function ---
@@ -362,8 +362,8 @@ def main():
             )
 
             if not dates:
-                 print(f"No data loaded from {csv_full_path}. Please check the CSV file and parsing logic.")
-                 continue
+                print(f"No data loaded from {csv_full_path}. Please check the CSV file and parsing logic.")
+                continue
 
             print(f"Processing plots for {csv_full_path}...")
 
